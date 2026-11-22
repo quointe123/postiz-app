@@ -456,6 +456,8 @@ export class IntegrationRepository {
             not: upsert.id,
           },
           rootInternalId: rootId,
+          // a disconnected sibling keeps its wiped tokens
+          deletedAt: null,
         },
         data: {
           token,
@@ -507,6 +509,7 @@ export class IntegrationRepository {
         id,
         organizationId: org,
         refreshNeeded: false,
+        deletedAt: null,
       },
       data: {
         refreshNeeded: true,
