@@ -1,0 +1,50 @@
+---
+name: "Build Fork Image"
+
+# Builds the image deployed on our own server (amd64 only) and pushes it to
+# this fork's registry: ghcr.io/<owner>/postiz-app:latest and :<short sha>.
+# The upstream "Build Containers" workflow pushes to gitroomhq's registry.
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: build-fork-image
+  cancel-in-progress: true
+
+jobs:
+  build-image:
+    if: github.repository != 'gitroomhq/postiz-app'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to ghcr
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Build and Push Image
+        run: |
+          IMAGE=ghcr.io/$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          docker buildx build --platform linux/amd64 \
+            -f Dockerfile.dev \
+            -t $IMAGE:latest \
+            -t $IMAGE:$SHORT_SHA \
+            --build-arg NEXT_PUBLIC_VERSION=$SHORT_SHA \
+            --pull \
+            --provenance=false --sbom=false \
+            --push .
