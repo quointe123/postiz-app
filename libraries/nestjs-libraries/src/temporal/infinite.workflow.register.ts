@@ -15,6 +15,17 @@ export class InfiniteWorkflowRegister implements OnModuleInit {
             taskQueue: 'main',
           });
       } catch (err) {}
+
+      if (Number(process.env.MEDIA_RETENTION_DAYS) > 0) {
+        try {
+          await this._temporalService.client
+            ?.getRawClient()
+            ?.workflow?.start('mediaRetentionWorkflow', {
+              workflowId: 'media-retention-workflow',
+              taskQueue: 'main',
+            });
+        } catch (err) {}
+      }
     }
   }
 }

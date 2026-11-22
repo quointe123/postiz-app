@@ -98,6 +98,72 @@ export class MediaService {
     return this._mediaRepository.deleteMedia(org, id);
   }
 
+  // One page of the mediaRetentionWorkflow: removes from storage the files of
+  // the posts published more than MEDIA_RETENTION_DAYS days ago. A file is only
+  // removed when every post using it is published and does not repeat, so a
+  // scheduled, draft, failed or repeating post keeps its media. A file no post
+  // uses, or that a set or a signature holds, stays in the library.
+  async deleteExpiredMedia(lastId?: string) {
+    const days = Number(process.env.MEDIA_RETENTION_DAYS);
+    if (!days || days <= 0) {
+      return { deleted: 0, failed: 0 };
+    }
+
+    const before = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    const list = await this._mediaRepository.getMediaForRetention(
+      before,
+      lastId
+    );
+
+    let deleted = 0;
+    let failed = 0;
+    for (const media of list) {
+      try {
+        const posts = await this._mediaRepository.getPostsUsingMedia(
+          media.organizationId,
+          media.path
+        );
+        if (
+          !posts.length ||
+          posts.some(
+            (p) =>
+              p.state !== 'PUBLISHED' ||
+              p.intervalInDays ||
+              p.publishDate > before
+          ) ||
+          (await this._mediaRepository.isMediaInReusableContent(
+            media.organizationId,
+            media.path
+          ))
+        ) {
+          continue;
+        }
+
+        for (const file of [media.path, media.thumbnail]) {
+          if (!file) {
+            continue;
+          }
+          try {
+            await this.storage.removeFile(file);
+          } catch (err: any) {
+            // already gone from storage, the record is still marked as deleted
+            if (err?.code !== 'ENOENT') {
+              throw err;
+            }
+          }
+        }
+
+        await this._mediaRepository.deleteMedia(media.organizationId, media.id);
+        deleted++;
+      } catch (err) {
+        failed++;
+        console.error(`Could not remove expired media ${media.id}:`, err);
+      }
+    }
+
+    return { deleted, failed, lastId: list[list.length - 1]?.id };
+  }
+
   getMediaById(id: string) {
     return this._mediaRepository.getMediaById(id);
   }

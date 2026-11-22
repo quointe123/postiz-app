@@ -23,4 +23,10 @@ export class MediaActivity {
   async failMediaProcessing(mediaId: string, error: string) {
     return this._mediaService.failProcessing(mediaId, error);
   }
+
+  // Returns how many files were removed, and the id to continue from
+  @ActivityMethod()
+  async deleteExpiredMedia(lastId?: string) {
+    return this._mediaService.deleteExpiredMedia(lastId);
+  }
 }
