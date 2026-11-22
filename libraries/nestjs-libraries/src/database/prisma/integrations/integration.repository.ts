@@ -870,6 +870,9 @@ export class IntegrationRepository {
     });
   }
 
+  // The channel row is kept (soft delete) but its tokens are wiped: a
+  // disconnected channel can no longer act on the account, and connecting it
+  // again stores fresh tokens through createOrUpdateIntegration
   deleteChannel(org: string, id: string) {
     return this._integration.model.integration.update({
       select: {
@@ -881,6 +884,8 @@ export class IntegrationRepository {
       },
       data: {
         deletedAt: new Date(),
+        token: '',
+        refreshToken: null,
       },
     });
   }
